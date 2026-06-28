@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Information about registered users (students/staff/admins)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["ADMIN", "STAFF", "STUDENT"] },
+        "createdAt": { "type": "integer" }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "Lab": {
+      "title": "Virtual Lab",
+      "description": "Definition of a virtual lab environment and its practice questions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "serverType": { "type": "string" },
+        "duration": { "type": "integer" },
+        "sketchfabUrl": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "category": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "questions": { "type": "array" },
+        "createdAt": { "type": "integer" }
+      },
+      "required": ["id", "name", "description", "serverType", "duration", "creatorId"]
+    },
+    "LabSession": {
+      "title": "Lab Session",
+      "description": "Record of a student's attempt at a lab",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "labId": { "type": "string" },
+        "userId": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "completed"] },
+        "progress": { "type": "integer" },
+        "totalScore": { "type": "integer" },
+        "startTime": { "type": "integer" },
+        "endTime": { "type": "integer" },
+        "answers": { "type": "object" }
+      },
+      "required": ["id", "labId", "userId", "status", "progress", "startTime"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Public and private user profile data"
+    },
+    "labs/{labId}": {
+      "schema": "Lab",
+      "description": "Global lab definitions"
+    },
+    "sessions/{sessionId}": {
+      "schema": "LabSession",
+      "description": "Individual student lab session records"
+    }
+  }
+}

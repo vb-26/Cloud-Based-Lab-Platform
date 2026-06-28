@@ -1,0 +1,5 @@
+{
+  "name": "Virtual Lab Practice Monitoring System",
+  "description": "A comprehensive platform for virtual labs with admin management, staff-led lab creation, and real-time student monitoring.",
+  "requestFramePermissions": []
+}

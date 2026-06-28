@@ -1,0 +1,111 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Cached user data for role checks
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             getUserData().role == 'ADMIN';
+    }
+
+    function isStaff() {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             (getUserData().role == 'STAFF' || getUserData().role == 'ADMIN');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      // Firebase UIDs and auto-generated IDs match this
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- Entity Validations ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'name', 'email', 'role', 'createdAt']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() > 0 &&
+             data.role in ['ADMIN', 'STAFF', 'STUDENT'];
+    }
+
+    function isValidLab(data) {
+      return data.keys().hasAll(['id', 'name', 'staffId', 'serverType', 'duration', 'maxStudents']) &&
+             data.name is string && data.name.size() > 0 &&
+             data.staffId is string && data.staffId.size() > 0 &&
+             data.duration is int && data.duration > 0 &&
+             data.maxStudents is int && data.maxStudents > 0;
+    }
+
+    function isValidSession(data) {
+      return data.keys().hasAll(['id', 'labId', 'userId', 'status', 'progress', 'startTime']) &&
+             data.status in ['active', 'completed', 'ACTIVE', 'COMPLETED'] &&
+             data.progress is int && data.progress >= 0 && data.progress <= 100;
+    }
+
+    // --- Collection Matches ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isStaff();
+      allow list: if isStaff();
+      
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().role == 'STUDENT';
+      allow update: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidUser(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /labs/{labId} {
+      allow read: if isSignedIn();
+      allow create: if isStaff() && isValidLab(incoming());
+      allow update: if isStaff() && isValidLab(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /sessions/{sessionId} {
+      allow get: if isSignedIn() && (isOwner(existing().userId) || isStaff());
+      allow list: if isSignedIn() && (isStaff() || (resource.data.userId == request.auth.uid));
+      
+      allow create: if isSignedIn() && isOwner(incoming().userId) && isValidSession(incoming());
+      
+      allow update: if isSignedIn() && (isOwner(existing().userId) || isAdmin()) && (
+        // Allow updating progress, answers, status, totalScore, code
+        incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'answers', 'status', 'totalScore', 'code'])
+      );
+      
+      allow delete: if isAdmin();
+    }
+    
+    match /_connection_test_/{docId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}
+
+
